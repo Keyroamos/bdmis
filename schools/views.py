@@ -80,12 +80,21 @@ def get_csrf_token(request):
     """
     return JsonResponse({'detail': 'CSRF cookie set'})
 
-@cache_page(60 * 15)
 def spa_index(request):
     """
     Serve the React frontend index.html for all SPA routes.
-    Includes error handling and caching to prevent 500 errors on reload.
+    Uses manual caching to ensure we only cache success states, not errors.
     """
+    # 1. Try to get from cache first
+    cache_key = 'spa_index_html_v2'
+    content = cache.get(cache_key)
+    
+    if content:
+        response = HttpResponse(content, content_type='text/html')
+        response['X-Cache-Status'] = 'HIT'
+        return response
+
+    # 2. If not in cache, try to load from disk
     try:
         # Resolve the index.html path from the frontend dist
         index_path = os.path.join(settings.BASE_DIR, 'frontend', 'dist', 'index.html')
@@ -93,21 +102,35 @@ def spa_index(request):
         if os.path.exists(index_path):
             with open(index_path, 'r', encoding='utf-8') as f:
                 content = f.read()
-            return HttpResponse(content, content_type='text/html')
+            # Cache the successful content for 1 hour
+            cache.set(cache_key, content, 3600)
+            
+            response = HttpResponse(content, content_type='text/html')
+            response['X-Cache-Status'] = 'MISS'
+            return response
             
         # Fallback to finding it via Django's template engine
         from django.template.loader import render_to_string
         content = render_to_string('index.html')
+        # Cache fallback content too
+        cache.set(cache_key, content, 300)
+        
         return HttpResponse(content, content_type='text/html')
+        
     except Exception as e:
         logger.error(f"Error serving SPA index: {str(e)}")
         # If all fails, return a basic loading page that reloads to try again
-        return HttpResponse(
+        # IMPORTANT: Do NOT cache this response
+        response = HttpResponse(
             "<html><body style='font-family:sans-serif; text-align:center; padding-top:20vh;'>"
             "<h1>EduManage Loading...</h1><p>The system is initializing. This should take a moment.</p>"
             "<script>setTimeout(() => window.location.reload(), 2000);</script></body></html>",
             status=200
         )
+        # Prevent browser caching of this error page
+        response['Cache-Control'] = 'no-store, no-cache, must-revalidate, max-age=0'
+        response['Pragma'] = 'no-cache'
+        return response
 
 
 # Authentication Views
