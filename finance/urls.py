@@ -1,0 +1,22 @@
+from django.urls import path
+from . import views
+
+urlpatterns = [
+    path('dashboard/', views.api_finance_dashboard, name='api_finance_dashboard'),
+    path('students/', views.api_finance_students, name='api_finance_students'),
+    path('students/<int:student_id>/', views.api_finance_student_detail, name='api_finance_student_detail'),
+    path('transactions/<int:transaction_id>/', views.api_finance_transaction_detail, name='api_finance_transaction_detail'),
+    path('transactions/<int:transaction_id>/pdf/', views.api_download_transaction_pdf, name='api_download_transaction_pdf'),
+    path('transactions/', views.api_finance_transactions, name='api_finance_transactions'),
+    path('transactions/all/', views.api_finance_all_transactions, name='api_finance_all_transactions'),
+    path('reports/', views.api_finance_reports, name='api_finance_reports'),
+    # Add simpler path for API consistency if needed
+    path('salaries/', views.api_finance_salaries, name='api_finance_salaries'),
+    path('salaries/process/', views.api_finance_payroll_process, name='api_finance_payroll_process'),
+    path('salaries/<int:user_id>/update/', views.api_finance_salary_update, name='api_finance_salary_update'),
+    path('fee-structures/', views.api_fee_structures, name='api_fee_structures'),
+    path('fee-structures/update/', views.api_update_fee_structure, name='api_update_fee_structure'),
+    path('student-fee-summary/', views.api_student_fee_summary, name='api_student_fee_summary'),
+    path('transport-summary/', views.api_transport_finance_summary, name='api_transport_finance_summary'),
+    path('catering-summary/', views.api_food_finance_summary, name='api_food_finance_summary'),
+]
