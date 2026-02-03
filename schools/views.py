@@ -10,6 +10,8 @@ from django.utils import timezone
 from django.core.exceptions import PermissionDenied, ValidationError
 from django.conf import settings
 import logging
+logger = logging.getLogger(__name__)
+
 from django.db.models import (
     Count,
     Q, Sum, Count, Avg, F, ExpressionWrapper, FloatField, Value, 
@@ -39,7 +41,7 @@ from django.views.generic import ListView, CreateView, DetailView, UpdateView, D
 from django.contrib.auth.mixins import LoginRequiredMixin, UserPassesTestMixin, PermissionRequiredMixin
 from django.urls import reverse, reverse_lazy
 from django.views.decorators.csrf import csrf_exempt, ensure_csrf_cookie
-from django.views.decorators.cache import never_cache
+from django.views.decorators.cache import never_cache, cache_page
 from django.views.decorators.http import require_http_methods
 import json  # Add this import
 from django.db import models
@@ -77,6 +79,36 @@ def get_csrf_token(request):
     Endpoint to set CSRF cookie for the frontend
     """
     return JsonResponse({'detail': 'CSRF cookie set'})
+
+@cache_page(60 * 15)
+def spa_index(request):
+    """
+    Serve the React frontend index.html for all SPA routes.
+    Includes error handling and caching to prevent 500 errors on reload.
+    """
+    try:
+        # Resolve the index.html path from the frontend dist
+        index_path = os.path.join(settings.BASE_DIR, 'frontend', 'dist', 'index.html')
+        
+        if os.path.exists(index_path):
+            with open(index_path, 'r', encoding='utf-8') as f:
+                content = f.read()
+            return HttpResponse(content, content_type='text/html')
+            
+        # Fallback to finding it via Django's template engine
+        from django.template.loader import render_to_string
+        content = render_to_string('index.html')
+        return HttpResponse(content, content_type='text/html')
+    except Exception as e:
+        logger.error(f"Error serving SPA index: {str(e)}")
+        # If all fails, return a basic loading page that reloads to try again
+        return HttpResponse(
+            "<html><body style='font-family:sans-serif; text-align:center; padding-top:20vh;'>"
+            "<h1>EduManage Loading...</h1><p>The system is initializing. This should take a moment.</p>"
+            "<script>setTimeout(() => window.location.reload(), 2000);</script></body></html>",
+            status=200
+        )
+
 
 # Authentication Views
 @csrf_exempt

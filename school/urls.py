@@ -40,8 +40,9 @@ if settings.DEBUG:
     urlpatterns += static(settings.STATIC_URL, document_root=settings.STATIC_ROOT)
 
 # Catch-all for React frontend (must be last)
+from schools.views import spa_index
 urlpatterns += [
-    re_path(r'^.*$', never_cache(TemplateView.as_view(template_name='index.html')), name='frontend'),
+    re_path(r'^.*$', spa_index, name='frontend'),
 ]
 
 if settings.DEBUG:
