@@ -1,19 +1,19 @@
 from io import BytesIO
-from reportlab.pdfgen import canvas
-from reportlab.lib.pagesizes import A5, letter, A4
-from reportlab.lib import colors
-from reportlab.lib.units import inch, cm, mm
-from reportlab.platypus import Table, TableStyle, SimpleDocTemplate, Paragraph, Spacer, Image, HRFlowable
-from reportlab.pdfbase import pdfmetrics
-from reportlab.pdfbase.ttfonts import TTFont
+# from reportlab.pdfgen import canvas
+# from reportlab.lib.pagesizes import A5, letter, A4
+# from reportlab.lib import colors
+# from reportlab.lib.units import inch, cm, mm
+# from reportlab.platypus import Table, TableStyle, SimpleDocTemplate, Paragraph, Spacer, Image, HRFlowable
+# from reportlab.pdfbase import pdfmetrics
+# from reportlab.pdfbase.ttfonts import TTFont
 from django.conf import settings
 from django.core.mail import EmailMessage
 import os
-import qrcode
+# import qrcode
 import json
 import base64
 import tempfile
-from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+# from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from django.utils import timezone
 import logging
 
@@ -21,6 +21,7 @@ logger = logging.getLogger(__name__)
 
 def generate_receipt_qr(data):
     """Helper function to generate QR codes for receipts with consistent settings"""
+    import qrcode
     qr = qrcode.QRCode(
         version=1,
         error_correction=qrcode.constants.ERROR_CORRECT_H,
@@ -110,6 +111,14 @@ def generate_payment_receipt(payment, qr_code=None):
     else:
         payment_term = payment.term if hasattr(payment, 'term') else 1
     
+    # Import reportlab modules locally to save memory on import
+    from reportlab.pdfgen import canvas
+    from reportlab.lib.pagesizes import A5, letter, A4
+    from reportlab.lib import colors
+    from reportlab.lib.units import inch, cm, mm
+    from reportlab.platypus import Table, TableStyle, SimpleDocTemplate, Paragraph, Spacer, Image, HRFlowable
+    from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+
     # Create the PDF object using ReportLab with adjusted margins
     doc = SimpleDocTemplate(
         buffer,

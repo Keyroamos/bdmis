@@ -22,19 +22,19 @@ from django.db.models.functions import (
     Coalesce, TruncMonth, Cast
 )
 from collections import Counter, defaultdict
-from openpyxl import Workbook
-from openpyxl.utils import get_column_letter
-from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
-from reportlab.lib import colors
-from reportlab.lib.pagesizes import letter, A4
-from reportlab.lib.units import inch, mm
-from reportlab.pdfgen import canvas
-from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle
-from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+# from openpyxl import Workbook
+# from openpyxl.utils import get_column_letter
+# from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
+# from reportlab.lib import colors
+# from reportlab.lib.pagesizes import letter, A4
+# from reportlab.lib.units import inch, mm
+# from reportlab.pdfgen import canvas
+# from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle
+# from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from io import BytesIO
 import os
 import base64
-import qrcode
+# import qrcode
 import traceback
 from django.core.paginator import Paginator
 from django.views.generic import ListView, CreateView, DetailView, UpdateView, DeleteView
