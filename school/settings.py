@@ -38,6 +38,8 @@ ALLOWED_HOSTS = os.environ.get('ALLOWED_HOSTS', '*').split(',') if os.environ.ge
     'auth-system.bdmis.co.ke',
     'edumanage.bdmis.co.ke',
     'www.edumanage.bdmis.co.ke',
+    'uniqo.top',
+    'www.uniqo.top',
     'localhost',
     '127.0.0.1',
     '*'
@@ -107,6 +109,7 @@ WSGI_APPLICATION = 'school.wsgi.application'
 
 DATABASES = {
     'default': {
+        'CONN_MAX_AGE': 60,  # Keep database connections alive for 60 seconds
         'ENGINE': 'django.db.backends.sqlite3',
         'NAME': BASE_DIR / 'db.sqlite3',
     }
