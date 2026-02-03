@@ -302,7 +302,8 @@ CSP_SCRIPT_SRC = (
     "https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js",
 ) 
 # WhiteNoise Configuration for Static Files
-STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage'
+# Switched to non-manifest storage to prevent 500 errors on missing files
+STATICFILES_STORAGE = 'whitenoise.storage.CompressedStaticFilesStorage'
 
 # Caching Configuration
 CACHES = {
