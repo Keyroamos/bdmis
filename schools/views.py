@@ -164,13 +164,14 @@ def api_login(request):
 @csrf_exempt
 @require_http_methods(["GET"])
 def api_student_list(request):
-    """API endpoint for fetching student list with filters"""
+    """API endpoint for fetching student list with filters - Optimized with annotations"""
     try:
         from django.core.paginator import Paginator
-        from django.db.models import Q
+        from django.db.models import Q, Sum, Value, DecimalField, Case, When, F
+        from django.db.models.functions import Coalesce
         
-        # Base Query
-        students = Student.objects.select_related('grade').all().order_by('-created_at')
+        # Base Query with related objects
+        students = Student.objects.select_related('grade', 'branch').all().order_by('-created_at')
         
         # Filtering
         search = request.GET.get('search', '')
@@ -185,11 +186,26 @@ def api_student_list(request):
         if grade_id:
             students = students.filter(grade_id=grade_id)
             
-        status = request.GET.get('status') # e.g., 'active' or 'graduated' (if you had a status field, assuming logic here)
-            
+        # Optimization: Annotate balance to avoid N+1 queries in the loop
+        students = students.annotate(
+            total_paid_annot=Coalesce(Sum('payments__amount'), Value(0), output_field=DecimalField(max_digits=12, decimal_places=2)),
+            fees_due_annot=Case(
+                When(current_term=1, then=F('term1_fees')),
+                When(current_term=2, then=F('term1_fees') + F('term2_fees')),
+                When(current_term=3, then=F('term1_fees') + F('term2_fees') + F('term3_fees')),
+                default=Value(0),
+                output_field=DecimalField(max_digits=12, decimal_places=2)
+            )
+        ).annotate(
+            balance_annot=ExpressionWrapper(
+                F('fees_due_annot') - F('total_paid_annot'),
+                output_field=DecimalField(max_digits=12, decimal_places=2)
+            )
+        )
+
         # Pagination
         page = request.GET.get('page', 1)
-        per_page = request.GET.get('per_page', 100)
+        per_page = int(request.GET.get('per_page', 50)) # Reduced default for better performance
         paginator = Paginator(students, per_page)
         
         try:
@@ -197,7 +213,7 @@ def api_student_list(request):
         except:
             paginated_students = paginator.page(1)
             
-        # Serialization
+        # Serialization - Use annotated balance_annot
         data = [{
             'id': s.id,
             'admission_number': s.admission_number,
@@ -207,46 +223,17 @@ def api_student_list(request):
             'grade': s.grade.name if s.grade else 'N/A',
             'gender': s.gender,
             'parent_phone': s.parent_phone,
-            'balance': float(s.get_balance() or 0),
-            'status': 'ACTIVE', # Placeholder, replace with actual status logic
+            'balance': float(s.balance_annot),
+            'status': 'ACTIVE',
             'photo': s.photo.url if s.photo else None,
             'branch': s.branch.name if s.branch else 'N/A'
         } for s in paginated_students]
         
-        # Calculate stats on the full filtered queryset (not just paginated)
+        # Stats on the full filtered queryset
         stats = {
-            'fully_paid': 0,
-            'total_count': students.count()
+            'fully_paid': students.filter(balance_annot__lte=0).count(),
+            'total_count': paginator.count
         }
-        
-        try:
-            # Annotation to calculate balance in DB
-            # Balance = (Fees due based on current_term) - (Total Payments)
-            
-            # 1. Total Payments
-            students_with_payments = students.annotate(
-                total_paid_annot=Coalesce(Sum('payments__amount'), Value(0), output_field=DecimalField())
-            )
-            
-            # 2. Total Due (Dynamic based on current_term)
-            students_with_balance = students_with_payments.annotate(
-                fees_due_annot=Case(
-                    When(current_term=1, then=F('term1_fees')),
-                    When(current_term=2, then=F('term1_fees') + F('term2_fees')),
-                    When(current_term=3, then=F('term1_fees') + F('term2_fees') + F('term3_fees')),
-                    default=Value(0),
-                    output_field=DecimalField()
-                )
-            ).annotate(
-                balance_annot=F('fees_due_annot') - F('total_paid_annot')
-            )
-            
-            # 3. Count where balance <= 0
-            stats['fully_paid'] = students_with_balance.filter(balance_annot__lte=0).count()
-            
-        except Exception as e:
-            print(f"Error calculating stats: {e}")
-            # Fallback (optional, or just leave as 0)
         
         return JsonResponse({
             'students': data,
@@ -257,7 +244,9 @@ def api_student_list(request):
         })
         
     except Exception as e:
-        return JsonResponse({'error': str(e)}, status=500)
+        import traceback
+        logger.error(f"Student list error: {str(e)}\n{traceback.format_exc()}")
+        return JsonResponse({'error': f"Internal Server Error: {str(e)}"}, status=500)
 
 @csrf_exempt
 @require_http_methods(["GET"])
@@ -611,21 +600,28 @@ def api_student_create(request):
 @csrf_exempt
 @require_http_methods(["GET"])
 def api_dashboard(request):
-    """API endpoint for dashboard statistics"""
+    """API endpoint for dashboard statistics with caching and optimizations"""
+    from django.core.cache import cache
+    
+    # Try to get from cache first
+    cache_key = 'api_dashboard_stats'
+    cached_data = cache.get(cache_key)
+    if cached_data:
+        return JsonResponse(cached_data)
+
     try:
         from django.db import transaction
-        import uuid
         from django.db.models import Sum, Count, F, Value, DecimalField, Q
-        from django.db.models.functions import Coalesce
-        from datetime import  timedelta
+        from django.db.models.functions import Coalesce, TruncMonth
+        from datetime import timedelta
         import calendar
+        from django.utils import timezone
         
         today = timezone.now().date()
         
-        # Student Stats
-        all_students = Student.objects.all()
-        total_students = all_students.count()
-        new_students = all_students.filter(
+        # Student Stats - Basic count is fast
+        total_students = Student.objects.count()
+        new_students = Student.objects.filter(
             created_at__month=timezone.now().month,
             created_at__year=timezone.now().year
         ).count()
@@ -637,83 +633,81 @@ def api_dashboard(request):
         )
         
         # Attendance Stats
-        todays_attendance = Attendance.objects.filter(date=today)
-        present_today = todays_attendance.filter(status='PRESENT').count()
+        present_today = Attendance.objects.filter(date=today, status='PRESENT').count()
         attendance_rate = (present_today / total_students * 100) if total_students > 0 else 0
         
-        # Fee Stats (School Fees Only)
-        students_with_fees = all_students.annotate(
-            total_paid=Coalesce(
-                Sum('payments__amount'), 
-                Value(0), 
-                output_field=DecimalField(max_digits=10, decimal_places=2)
-            )
-        )
-        
-        total_fees = students_with_fees.aggregate(
+        # Fee Stats - Optimized to use direct aggregates instead of annotate + aggregate
+        total_fees = Student.objects.aggregate(
             total=Coalesce(Sum('term_fees'), Value(0), output_field=DecimalField(max_digits=10, decimal_places=2))
-        )['total']
+        )['total'] or 0
         
-        fees_collected = students_with_fees.aggregate(
-            total=Coalesce(Sum('total_paid'), Value(0), output_field=DecimalField(max_digits=10, decimal_places=2))
-        )['total']
+        fees_collected = Payment.objects.aggregate(
+            total=Coalesce(Sum('amount'), Value(0), output_field=DecimalField(max_digits=10, decimal_places=2))
+        )['total'] or 0
         
-        # Transport Income
+        # Transport Income - Safe aggregation
         try:
-            from transport.models import TransportTransaction
+            from transport.models import TransportTransaction, TransportFee
             transport_income_tx = TransportTransaction.objects.filter(type='PAYMENT').aggregate(sum=Sum('amount'))['sum'] or 0
-        except:
+        except (ImportError, Exception):
             transport_income_tx = 0
             
         try:
+            from transport.models import TransportFee
             transport_income_fee = TransportFee.objects.filter(status='COMPLETED').aggregate(sum=Sum('amount'))['sum'] or 0
-        except:
+        except (ImportError, Exception):
             transport_income_fee = 0
             
         total_transport_income = float(transport_income_tx) + float(transport_income_fee)
         
-        # Food Income
+        # Food Income - Safe aggregation
         try:
+            from food.models import FoodFee, StudentMealPayment
             food_income_fee = FoodFee.objects.filter(status='COMPLETED').aggregate(sum=Sum('amount'))['sum'] or 0
-        except:
-            food_income_fee = 0
-            
-        try:
             food_income_meal = StudentMealPayment.objects.filter(status='COMPLETED').aggregate(sum=Sum('amount'))['sum'] or 0
-        except:
+        except (ImportError, Exception):
+            food_income_fee = 0
             food_income_meal = 0
 
         try:
             from food.models import FoodTransaction
             food_income_modern = FoodTransaction.objects.filter(type='PAYMENT').aggregate(sum=Sum('amount'))['sum'] or 0
-        except:
+        except (ImportError, Exception):
             food_income_modern = 0
             
         total_food_income = float(food_income_fee) + float(food_income_meal) + float(food_income_modern)
         
         # Total Revenue (All Sources)
-        total_collected = float(fees_collected or 0) + total_transport_income + total_food_income
+        total_collected = float(fees_collected) + total_transport_income + total_food_income
         
-        # Chart Data (Last 6 months)
+        # Chart Data (Last 6 months) - Optimized using TruncMonth
+        six_months_ago = today - timedelta(days=180)
+        monthly_stats = Payment.objects.filter(
+            date__gte=six_months_ago.replace(day=1)
+        ).annotate(
+            month=TruncMonth('date')
+        ).values('month').annotate(
+            total=Sum('amount')
+        ).order_by('month')
+
+        # Fill in labels and data for the last 6 months
         chart_labels = []
         chart_data = []
         
+        # Create a lookup for data we found
+        month_lookup = {ms['month'].strftime('%b'): float(ms['total'] or 0) for ms in monthly_stats}
+        
         for i in range(5, -1, -1):
-            current = today - timedelta(days=today.day - 1) - timedelta(days=30*i)
-            month_start = current.replace(day=1)
-            month_end = current.replace(day=calendar.monthrange(current.year, current.month)[1])
+            # Calculate months to show
+            current = (today.replace(day=1) - timedelta(days=30*i)).replace(day=1)
+            label = current.strftime('%b')
+            chart_labels.append(label)
+            chart_data.append(month_lookup.get(label, 0.0))
             
-            month_total = Payment.objects.filter(
-                date__gte=month_start,
-                date__lte=month_end
-            ).aggregate(
-                total=Coalesce(Sum('amount'), Value('0.00'), output_field=DecimalField(max_digits=10, decimal_places=2))
-            )['total']
-            
-            chart_labels.append(current.strftime('%b'))
-            chart_data.append(float(month_total))
-            
-        recent_payments = Payment.objects.select_related('student').order_by('-date')[:5]
+        recent_payments = Payment.objects.select_related('student').only(
+            'id', 'student__first_name', 'student__last_name', 'amount', 'date', 'payment_method'
+        ).order_by('-date')[:5]
+        
         recent_payments_data = [{
             'id': p.id,
             'student_name': p.student.get_full_name(),
@@ -722,24 +716,32 @@ def api_dashboard(request):
             'method': p.payment_method
         } for p in recent_payments]
 
-        return JsonResponse({
+        response_data = {
             'stats': {
                 'total_students': total_students,
                 'new_students': new_students,
                 'total_teachers': teacher_stats['total'],
                 'attendance_rate': round(attendance_rate, 1),
-                'total_revenue': float(total_collected or 0),
-                'revenue_growth': 12.5, # Placeholder or calc real growth
+                'total_revenue': float(total_collected),
+                'revenue_growth': 0, # Growth calc could be added if needed
             },
             'chart_data': {
                 'labels': chart_labels,
                 'revenue': chart_data
             },
-            'recent_payments': recent_payments_data
-        })
+            'recent_payments': recent_payments_data,
+            'cached_at': timezone.now().isoformat()
+        }
+        
+        # Cache the result for 5 minutes
+        cache.set(cache_key, response_data, 300)
+        
+        return JsonResponse(response_data)
 
     except Exception as e:
-        return JsonResponse({'error': str(e)}, status=500)
+        import traceback
+        logger.error(f"Dashboard error: {str(e)}\n{traceback.format_exc()}")
+        return JsonResponse({'error': f"Internal Server Error: {str(e)}"}, status=500)
 
 @csrf_exempt
 @require_http_methods(["GET"])
@@ -756,15 +758,16 @@ def api_subjects(request):
 @csrf_exempt
 @require_http_methods(["GET"])
 def api_teacher_list(request):
-    """API endpoint for fetching teachers list"""
+    """API endpoint for fetching teachers list - Optimized with prefetch_related"""
     try:
         from django.core.paginator import Paginator, EmptyPage
         
         page = int(request.GET.get('page', 1))
-        per_page = int(request.GET.get('per_page', 100))
+        per_page = int(request.GET.get('per_page', 50))
         search = request.GET.get('search', '')
         status = request.GET.get('status', '')
 
+        # Optimization: Use select_related and prefetch_related
         teachers = Teacher.objects.all().select_related('grade').prefetch_related('subjects').order_by('first_name')
 
         if search:
@@ -787,15 +790,15 @@ def api_teacher_list(request):
             
         data = []
         for t in current_page:
-            try:
-                subjects = [s.name for s in t.subjects.all()]
-            except Exception:
-                subjects = []
+            # subjects.all() is now prefetched, so this is fast
+            subjects = [s.name for s in t.subjects.all()]
                 
+            avatar = None
             try:
-                avatar = t.profile_picture.url if t.profile_picture and t.profile_picture.name else None
+                if t.profile_picture and t.profile_picture.name:
+                    avatar = t.profile_picture.url
             except Exception:
-                avatar = None
+                pass
 
             data.append({
                 'id': t.id,
@@ -817,9 +820,8 @@ def api_teacher_list(request):
         })
     except Exception as e:
         import traceback
-        with open('api_teacher_error.log', 'a') as f:
-            f.write(f"Error: {str(e)}\n{traceback.format_exc()}\n")
-        return JsonResponse({'error': str(e)}, status=500)
+        logger.error(f"Teacher list error: {str(e)}\n{traceback.format_exc()}")
+        return JsonResponse({'error': f"Internal Server Error: {str(e)}"}, status=500)
 
 @csrf_exempt
 @require_http_methods(["GET", "POST"])
@@ -1051,25 +1053,32 @@ def api_teacher_detail(request, pk):
 @require_http_methods(["GET"])
 @login_required
 def api_finance_stats(request):
-    """API endpoint for finance dashboard statistics"""
+    """API endpoint for finance dashboard statistics with caching and optimizations"""
+    from django.core.cache import cache
+    
+    # Try to get from cache first
+    cache_key = f'api_finance_stats_{request.GET.get("year", "default")}'
+    cached_data = cache.get(cache_key)
+    if cached_data:
+        return JsonResponse(cached_data)
+
     try:
         from django.db.models import Sum, Count, F, Value, DecimalField
         from django.db.models.functions import Coalesce, TruncMonth
         from datetime import  timedelta
         import calendar
+        from django.utils import timezone
         
         today = timezone.now().date()
         year = request.GET.get('year', today.year)
         
-        # 1. Summary Stats
-        # Total Fees Expected (Sum of term_fees for all active students)
+        # 1. Summary Stats - Direct aggregates are faster
         total_expected = Student.objects.aggregate(
-            total=Coalesce(Sum('term_fees'), Value(0), output_field=DecimalField())
+            total=Coalesce(Sum('term_fees'), Value(0), output_field=DecimalField(max_digits=12, decimal_places=2))
         )['total']
         
-        # Total Collected (Sum of all payments)
         total_collected = Payment.objects.aggregate(
-            total=Coalesce(Sum('amount'), Value(0), output_field=DecimalField())
+            total=Coalesce(Sum('amount'), Value(0), output_field=DecimalField(max_digits=12, decimal_places=2))
         )['total']
         
         # Calculate pending
@@ -1080,24 +1089,27 @@ def api_finance_stats(request):
         # Collection Rate
         collection_rate = (total_collected_float / total_expected_float * 100) if total_expected_float > 0 else 0
 
-        # 2. Monthly Trends (Last 12 months)
+        # 2. Monthly Trends (Last 12 months) - Optimized with TruncMonth
+        one_year_ago = today - timedelta(days=365)
+        monthly_stats = Payment.objects.filter(
+            date__gte=one_year_ago.replace(day=1)
+        ).annotate(
+            month=TruncMonth('date')
+        ).values('month').annotate(
+            total=Sum('amount')
+        ).order_by('month')
+
         monthly_labels = []
         monthly_revenue = []
         
+        # Create lookup
+        month_lookup = {ms['month'].strftime('%b %Y'): float(ms['total'] or 0) for ms in monthly_stats}
+        
         for i in range(11, -1, -1):
-            current = today - timedelta(days=30*i) # Approx month
-            month_start = current.replace(day=1)
-            month_end = current.replace(day=calendar.monthrange(current.year, current.month)[1])
-            
-            month_total = Payment.objects.filter(
-                date__gte=month_start,
-                date__lte=month_end
-            ).aggregate(
-                total=Coalesce(Sum('amount'), Value(0), output_field=DecimalField())
-            )['total']
-            
-            monthly_labels.append(current.strftime('%b'))
-            monthly_revenue.append(float(month_total or 0))
+            current = (today.replace(day=1) - timedelta(days=30*i)).replace(day=1)
+            label = current.strftime('%b %Y')
+            monthly_labels.append(current.strftime('%b')) # Keep simple label for chart
+            monthly_revenue.append(month_lookup.get(label, 0.0))
 
         # 3. Payment Methods Breakdown
         payment_methods = Payment.objects.values('payment_method').annotate(
@@ -1112,7 +1124,11 @@ def api_finance_stats(request):
         } for pm in payment_methods]
         
         # 4. Recent Transactions
-        recent_tx = Payment.objects.select_related('student').order_by('-date')[:10]
+        recent_tx = Payment.objects.select_related('student').only(
+            'id', 'student__first_name', 'student__last_name', 'student__admission_number',
+            'amount', 'date', 'payment_method', 'transaction_id'
+        ).order_by('-date')[:10]
+        
         recent_data = [{
             'id': t.id,
             'student': t.student.get_full_name(),
@@ -1123,7 +1139,7 @@ def api_finance_stats(request):
             'reference': t.transaction_id or 'N/A'
         } for t in recent_tx]
 
-        return JsonResponse({
+        response_data = {
             'summary': {
                 'expected': total_expected_float,
                 'collected': total_collected_float,
@@ -1135,10 +1151,18 @@ def api_finance_stats(request):
                 'revenue': monthly_revenue
             },
             'methods': methods_data,
-            'recent_transactions': recent_data
-        })
+            'recent_transactions': recent_data,
+            'cached_at': timezone.now().isoformat()
+        }
+        
+        # Cache for 5 minutes
+        cache.set(cache_key, response_data, 300)
+        
+        return JsonResponse(response_data)
+        
     except Exception as e:
-        return JsonResponse({'error': str(e)}, status=500)
+        logger.error(f"Finance stats error: {str(e)}")
+        return JsonResponse({'error': f"Internal Server Error: {str(e)}"}, status=500)
 
 @csrf_exempt
 @require_http_methods(["POST"])

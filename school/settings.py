@@ -304,5 +304,21 @@ CSP_SCRIPT_SRC = (
 # WhiteNoise Configuration for Static Files
 STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage'
 
+# Caching Configuration
+CACHES = {
+    'default': {
+        'BACKEND': 'django.core.cache.backends.db.DatabaseCache',
+        'LOCATION': 'django_cache_table',
+        'TIMEOUT': 300,  # 5 minutes default timeout
+        'OPTIONS': {
+            'MAX_ENTRIES': 1000
+        }
+    }
+}
+
+# Update MIDDLEWARE to include caching middleware for better performance
+# Placing UpdateCacheMiddleware at the beginning and FetchFromCacheMiddleware at the end
+# is the standard way to enable site-wide caching, but we'll use per-view caching for more control.
+
 # SSL Proxy Header
 SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
