@@ -42,6 +42,7 @@ from django.contrib.auth.mixins import LoginRequiredMixin, UserPassesTestMixin, 
 from django.urls import reverse, reverse_lazy
 from django.views.decorators.csrf import csrf_exempt, ensure_csrf_cookie
 from django.views.decorators.cache import never_cache, cache_page
+from django.core.cache import cache
 from django.views.decorators.http import require_http_methods
 import json  # Add this import
 from django.db import models
