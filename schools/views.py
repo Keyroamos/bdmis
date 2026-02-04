@@ -84,53 +84,84 @@ def get_csrf_token(request):
 def spa_index(request):
     """
     Serve the React frontend index.html for all SPA routes.
-    Uses manual caching to ensure we only cache success states, not errors.
+    Includes robust error handling and fallback mechanisms.
     """
-    # 1. Try to get from cache first
     cache_key = 'spa_index_html_v2'
-    content = cache.get(cache_key)
     
-    if content:
-        response = HttpResponse(content, content_type='text/html')
-        response['X-Cache-Status'] = 'HIT'
-        return response
+    # 1. Try to get from cache first (safely)
+    try:
+        content = cache.get(cache_key)
+        if content:
+            response = HttpResponse(content, content_type='text/html')
+            response['X-Cache-Status'] = 'HIT'
+            return response
+    except Exception as e:
+        logger.warning(f"Cache read error in spa_index: {str(e)}")
+        # Continue to load from disk if cache fails
 
     # 2. If not in cache, try to load from disk
     try:
-        # Resolve the index.html path from the frontend dist
-        index_path = os.path.join(settings.BASE_DIR, 'frontend', 'dist', 'index.html')
+        # Resolve the index.html path - ensure BASE_DIR is converted to string for safety
+        base_dir_str = str(settings.BASE_DIR)
+        index_path = os.path.join(base_dir_str, 'frontend', 'dist', 'index.html')
+        
+        content = None
         
         if os.path.exists(index_path):
             with open(index_path, 'r', encoding='utf-8') as f:
                 content = f.read()
-            # Cache the successful content for 1 hour
-            cache.set(cache_key, content, 3600)
             
+            # Try to cache, but don't fail if caching fails
+            try:
+                cache.set(cache_key, content, 3600)
+            except Exception as e:
+                logger.warning(f"Cache write error in spa_index: {str(e)}")
+                
             response = HttpResponse(content, content_type='text/html')
             response['X-Cache-Status'] = 'MISS'
             return response
             
         # Fallback to finding it via Django's template engine
         from django.template.loader import render_to_string
-        content = render_to_string('index.html')
-        # Cache fallback content too
-        cache.set(cache_key, content, 300)
-        
-        return HttpResponse(content, content_type='text/html')
+        try:
+            content = render_to_string('index.html')
+            # Cache fallback content too (safely)
+            try:
+                cache.set(cache_key, content, 300)
+            except Exception:
+                pass
+            return HttpResponse(content, content_type='text/html')
+        except Exception as template_err:
+            logger.error(f"Template load error: {template_err}")
+            # If template fails, raise to hit the main except block
+            raise template_err
         
     except Exception as e:
         logger.error(f"Error serving SPA index: {str(e)}")
-        # If all fails, return a basic loading page that reloads to try again
-        # IMPORTANT: Do NOT cache this response
-        response = HttpResponse(
-            "<html><body style='font-family:sans-serif; text-align:center; padding-top:20vh;'>"
-            "<h1>EduManage Loading...</h1><p>The system is initializing. This should take a moment.</p>"
-            "<script>setTimeout(() => window.location.reload(), 2000);</script></body></html>",
-            status=200
-        )
-        # Prevent browser caching of this error page
+        import traceback
+        tb = traceback.format_exc()
+        
+        # Return a more descriptive error page for debugging (in production this might be generic)
+        # But for now, user needs to get rid of the "stuck" page.
+        # If we are here, it means we genuinely CANNOT load the index.html.
+        
+        error_html = f"""
+        <html>
+            <body style='font-family:sans-serif; text-align:center; padding-top:10vh;'>
+                <h1 style='color: #e53e3e;'>System Initialization Error</h1>
+                <p>We could not load the application interface.</p>
+                <div style='text-align:left; max-width:800px; margin:0 auto; background:#f7fafc; padding:20px; border-radius:8px; overflow:auto;'>
+                    <p><strong>Error Details:</strong> {str(e)}</p>
+                    <pre>{tb}</pre>
+                </div>
+                <p>Please contact support if this persists.</p>
+                <button onclick="window.location.reload()" style="padding:10px 20px; background:#4F46E5; color:white; border:none; border-radius:5px; cursor:pointer; margin-top:20px;">Try Again</button>
+            </body>
+        </html>
+        """
+        
+        response = HttpResponse(error_html, status=503)
         response['Cache-Control'] = 'no-store, no-cache, must-revalidate, max-age=0'
-        response['Pragma'] = 'no-cache'
         return response
 
 
