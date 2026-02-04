@@ -1,53 +1,32 @@
 """
-Middleware for offline-first functionality
+Middleware for adding cache headers to improve performance
 """
-import logging
-from django.utils.deprecation import MiddlewareMixin
-from django.core.cache import cache
-from schools.utils.network import is_online, force_check_online
-from schools.models import SyncStatus
-
-logger = logging.getLogger(__name__)
-
-# Cache key for sync status update
-SYNC_STATUS_UPDATE_CACHE_KEY = 'sync_status_last_update'
-SYNC_STATUS_UPDATE_INTERVAL = 30  # Update sync status every 30 seconds max
+from django.utils.cache import patch_cache_control
 
 
-class OfflineDetectionMiddleware(MiddlewareMixin):
+class CacheControlMiddleware:
     """
-    Middleware to detect network status and update SyncStatus.
-    Checks network connectivity on each request, but throttles database updates.
+    Middleware to add Cache-Control headers to responses for better browser caching
     """
-    
-    def process_request(self, request):
-        """Check network status on each request"""
-        try:
-            # Check network status (use cache for performance)
-            # This is fast and non-blocking
-            online = is_online()
-            
-            # Add to request for use in views immediately
-            request.is_online = online
-            
-            # Throttle database updates to avoid excessive writes
-            # Only update SyncStatus every 30 seconds
-            last_update = cache.get(SYNC_STATUS_UPDATE_CACHE_KEY)
-            if last_update is None:
-                try:
-                    sync_status = SyncStatus.get_instance()
-                    sync_status.is_online = online
-                    sync_status.save(update_fields=['is_online'])
-                    # Cache the update timestamp for 30 seconds
-                    cache.set(SYNC_STATUS_UPDATE_CACHE_KEY, True, SYNC_STATUS_UPDATE_INTERVAL)
-                except Exception as db_error:
-                    # If database is not ready (during migrations), just log and continue
-                    logger.debug(f"Could not update SyncStatus: {str(db_error)}")
-            
-        except Exception as e:
-            logger.debug(f"Error in OfflineDetectionMiddleware: {str(e)}")
-            # Default to offline on error, but don't block the request
-            request.is_online = False
+    def __init__(self, get_response):
+        self.get_response = get_response
+
+    def __call__(self, request):
+        response = self.get_response(request)
         
-        return None
-
+        # Add cache headers for static files
+        if request.path.startswith('/static/'):
+            # Cache static files for 1 year (they have hashed filenames)
+            patch_cache_control(response, public=True, max_age=31536000, immutable=True)
+        
+        # Add cache headers for media files
+        elif request.path.startswith('/media/'):
+            # Cache media files for 1 week
+            patch_cache_control(response, public=True, max_age=604800)
+        
+        # Add cache headers for API responses (shorter cache)
+        elif request.path.startswith('/api/'):
+            # Don't cache API responses by default (they're dynamic)
+            patch_cache_control(response, private=True, no_cache=True, no_store=True, must_revalidate=True)
+        
+        return response

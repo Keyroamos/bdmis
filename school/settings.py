@@ -75,6 +75,7 @@ MIDDLEWARE = [
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
+    'schools.middleware.CacheControlMiddleware',  # Add cache headers
     # 'schools.middleware.OfflineDetectionMiddleware',  # Offline detection - Disabled for performance
 
 ]
@@ -314,17 +315,22 @@ CSP_SCRIPT_SRC = (
 STATICFILES_STORAGE = 'django.contrib.staticfiles.storage.StaticFilesStorage'
 
 # Caching Configuration
-# Switched to FileBasedCache to avoid SQLite locking issues on cPanel
+# Using FileBasedCache to avoid SQLite locking issues on cPanel
 CACHES = {
     'default': {
         'BACKEND': 'django.core.cache.backends.filebased.FileBasedCache',
         'LOCATION': os.path.join(BASE_DIR, 'django_cache'),
-        'TIMEOUT': 300,
+        'TIMEOUT': 3600,  # 1 hour default timeout (increased from 5 minutes)
         'OPTIONS': {
-            'MAX_ENTRIES': 1000
+            'MAX_ENTRIES': 5000,  # Increased from 1000
+            'CULL_FREQUENCY': 4,  # Remove 1/4 of entries when max is reached
         }
     }
 }
+
+# Cache key prefix to avoid conflicts
+CACHE_MIDDLEWARE_KEY_PREFIX = 'bdmis'
+CACHE_MIDDLEWARE_SECONDS = 3600  # Cache pages for 1 hour
 
 # Update MIDDLEWARE to include caching middleware for better performance
 # Placing UpdateCacheMiddleware at the beginning and FetchFromCacheMiddleware at the end

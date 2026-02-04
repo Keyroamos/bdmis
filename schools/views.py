@@ -94,6 +94,9 @@ def spa_index(request):
         if content:
             response = HttpResponse(content, content_type='text/html')
             response['X-Cache-Status'] = 'HIT'
+            # Add browser caching headers (cache for 5 minutes)
+            response['Cache-Control'] = 'public, max-age=300'
+            response['Vary'] = 'Accept-Encoding'
             return response
     except Exception as e:
         logger.warning(f"Cache read error in spa_index: {str(e)}")
@@ -119,6 +122,9 @@ def spa_index(request):
                 
             response = HttpResponse(content, content_type='text/html')
             response['X-Cache-Status'] = 'MISS'
+            # Add browser caching headers (cache for 5 minutes)
+            response['Cache-Control'] = 'public, max-age=300'
+            response['Vary'] = 'Accept-Encoding'
             return response
             
         # Fallback to finding it via Django's template engine
