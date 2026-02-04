@@ -309,11 +309,12 @@ CSP_SCRIPT_SRC = (
 STATICFILES_STORAGE = 'whitenoise.storage.CompressedStaticFilesStorage'
 
 # Caching Configuration
+# Switched to FileBasedCache to avoid SQLite locking issues on cPanel
 CACHES = {
     'default': {
-        'BACKEND': 'django.core.cache.backends.db.DatabaseCache',
-        'LOCATION': 'django_cache_table',
-        'TIMEOUT': 300,  # 5 minutes default timeout
+        'BACKEND': 'django.core.cache.backends.filebased.FileBasedCache',
+        'LOCATION': os.path.join(BASE_DIR, 'django_cache'),
+        'TIMEOUT': 300,
         'OPTIONS': {
             'MAX_ENTRIES': 1000
         }
