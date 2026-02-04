@@ -153,10 +153,16 @@ USE_TZ = True
 STATIC_URL = '/static/'
 STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles')  # For collectstatic
 
-STATICFILES_DIRS = [
-    os.path.join(BASE_DIR, 'static'),  # This is where your app's static files live
-    os.path.join(BASE_DIR, 'frontend/dist'),  # React build files
-]
+# Only include directories that exist
+STATICFILES_DIRS = []
+static_dir = os.path.join(BASE_DIR, 'static')
+if os.path.exists(static_dir):
+    STATICFILES_DIRS.append(static_dir)
+
+frontend_dist = os.path.join(BASE_DIR, 'frontend/dist')
+if os.path.exists(frontend_dist):
+    STATICFILES_DIRS.append(frontend_dist)
+
 
 
 MEDIA_URL = '/media/'
@@ -311,8 +317,12 @@ CSP_SCRIPT_SRC = (
     "https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js",
 ) 
 # WhiteNoise Configuration for Static Files
-# Switched to standard storage to reduce memory usage during serving
 STATICFILES_STORAGE = 'django.contrib.staticfiles.storage.StaticFilesStorage'
+
+# WhiteNoise settings for better static file serving
+WHITENOISE_USE_FINDERS = True  # Allow WhiteNoise to use Django's staticfiles finders
+WHITENOISE_AUTOREFRESH = True if DEBUG else False  # Auto-refresh in development
+WHITENOISE_MAX_AGE = 31536000 if not DEBUG else 0  # Cache for 1 year in production
 
 # Caching Configuration
 # Using FileBasedCache to avoid SQLite locking issues on cPanel
