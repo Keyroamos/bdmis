@@ -71,7 +71,8 @@ export default defineConfig({
         manualChunks: {
           vendor: ['react', 'react-dom', 'react-router-dom', 'framer-motion', 'axios'],
           charts: ['recharts'],
-          ui: ['lucide-react']
+          ui: ['lucide-react', 'clsx', 'tailwind-merge'],
+          maps: ['leaflet', 'react-leaflet']
         }
       }
     }

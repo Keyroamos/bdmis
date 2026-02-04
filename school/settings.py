@@ -174,6 +174,11 @@ LOGIN_URL = '/login/'  # Redirect to frontend login route
 LOGIN_REDIRECT_URL = '/dashboard'  # After successful login, redirect here
 LOGOUT_REDIRECT_URL = '/login/'  # After logout, redirect here
 
+# Session Configuration
+# Use signed cookies to avoid DB/Cache locking during high concurrency
+SESSION_ENGINE = 'django.contrib.sessions.backends.signed_cookies'
+SESSION_COOKIE_AGE = 1209600
+
 #MEDIA_URL = '/media/'
 #MEDIA_ROOT = os.path.join(BASE_DIR, 'media/')
 #STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles')
@@ -305,8 +310,8 @@ CSP_SCRIPT_SRC = (
     "https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js",
 ) 
 # WhiteNoise Configuration for Static Files
-# Switched to non-manifest storage to prevent 500 errors on missing files
-STATICFILES_STORAGE = 'whitenoise.storage.CompressedStaticFilesStorage'
+# Switched to standard storage to reduce memory usage during serving
+STATICFILES_STORAGE = 'django.contrib.staticfiles.storage.StaticFilesStorage'
 
 # Caching Configuration
 # Switched to FileBasedCache to avoid SQLite locking issues on cPanel
