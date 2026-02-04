@@ -110,9 +110,12 @@ WSGI_APPLICATION = 'school.wsgi.application'
 
 DATABASES = {
     'default': {
-        'CONN_MAX_AGE': 60,  # Keep database connections alive for 60 seconds
         'ENGINE': 'django.db.backends.sqlite3',
         'NAME': BASE_DIR / 'db.sqlite3',
+        'CONN_MAX_AGE': 0,  # Close connections immediately (prevents locking and reduces memory)
+        'OPTIONS': {
+            'timeout': 20,  # Timeout for database locks (seconds)
+        }
     }
 }
 
@@ -330,10 +333,10 @@ CACHES = {
     'default': {
         'BACKEND': 'django.core.cache.backends.filebased.FileBasedCache',
         'LOCATION': os.path.join(BASE_DIR, 'django_cache'),
-        'TIMEOUT': 3600,  # 1 hour default timeout (increased from 5 minutes)
+        'TIMEOUT': 3600,  # 1 hour default timeout
         'OPTIONS': {
-            'MAX_ENTRIES': 5000,  # Increased from 1000
-            'CULL_FREQUENCY': 4,  # Remove 1/4 of entries when max is reached
+            'MAX_ENTRIES': 1000,  # Reduced from 5000 to lower memory usage
+            'CULL_FREQUENCY': 3,  # Remove 1/3 of entries when max is reached
         }
     }
 }

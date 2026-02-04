@@ -1,0 +1,128 @@
+# Passenger Configuration for Django Application
+# ===============================================
+
+# Enable Passenger
+PassengerEnabled On
+PassengerAppRoot /home/bdmiscok/public_html/nedbdmis
+
+# Python Configuration
+PassengerPython /home/bdmiscok/virtualenv/public_html/nedbdmis/3.9/bin/python3.9
+
+# Performance & Stability Settings
+# ---------------------------------
+
+# Minimum number of application instances to keep running
+PassengerMinInstances 1
+
+# Maximum number of application instances
+# Keep this low to prevent memory exhaustion on shared hosting
+PassengerMaxPoolSize 2
+
+# Maximum number of requests a process will handle before being recycled
+# Helps prevent memory leaks from accumulating
+PassengerMaxRequests 500
+
+# Maximum time (in seconds) a request can take before being killed
+# Prevents long-running requests from blocking the server
+PassengerMaxRequestTime 30
+
+# Maximum memory (in MB) a process can use before being recycled
+PassengerMemoryLimit 512
+
+# Throttle stat() calls to reduce I/O overhead
+PassengerStatThrottleRate 5
+
+# Spawn Method
+# 'direct' is more stable for Django applications on shared hosting
+PassengerSpawnMethod direct
+
+# Startup File
+PassengerStartupFile passenger_wsgi.py
+
+# Logging Configuration
+# ---------------------
+
+# Log level: 0 (least verbose) to 7 (most verbose)
+# Use 3 for production, 5+ for debugging
+PassengerLogLevel 3
+
+# Custom log file location
+PassengerDebugLogFile /home/bdmiscok/logs/passenger.log
+
+# Application Environment
+# -----------------------
+
+# Set to 'production' for production servers
+PassengerAppEnv production
+
+# Error Documents
+# ---------------
+
+ErrorDocument 404 /404.html
+ErrorDocument 500 /500.html
+
+# Security Headers
+# ----------------
+
+<IfModule mod_headers.c>
+    # Prevent clickjacking
+    Header always set X-Frame-Options "DENY"
+    
+    # Prevent MIME type sniffing
+    Header always set X-Content-Type-Options "nosniff"
+    
+    # Enable XSS protection
+    Header always set X-XSS-Protection "1; mode=block"
+    
+    # Referrer policy
+    Header always set Referrer-Policy "strict-origin-when-cross-origin"
+</IfModule>
+
+# Compression
+# -----------
+
+<IfModule mod_deflate.c>
+    AddOutputFilterByType DEFLATE text/html text/plain text/xml text/css text/javascript application/javascript application/json
+</IfModule>
+
+# Browser Caching
+# ---------------
+
+<IfModule mod_expires.c>
+    ExpiresActive On
+    
+    # Images
+    ExpiresByType image/jpeg "access plus 1 year"
+    ExpiresByType image/png "access plus 1 year"
+    ExpiresByType image/gif "access plus 1 year"
+    ExpiresByType image/svg+xml "access plus 1 year"
+    ExpiresByType image/webp "access plus 1 year"
+    
+    # CSS and JavaScript
+    ExpiresByType text/css "access plus 1 month"
+    ExpiresByType application/javascript "access plus 1 month"
+    ExpiresByType text/javascript "access plus 1 month"
+    
+    # Fonts
+    ExpiresByType font/woff2 "access plus 1 year"
+    ExpiresByType font/woff "access plus 1 year"
+    ExpiresByType font/ttf "access plus 1 year"
+    
+    # Manifest
+    ExpiresByType application/manifest+json "access plus 1 week"
+</IfModule>
+
+# URL Rewriting
+# -------------
+
+<IfModule mod_rewrite.c>
+    RewriteEngine On
+    
+    # Force HTTPS (uncomment if you have SSL)
+    # RewriteCond %{HTTPS} off
+    # RewriteRule ^(.*)$ https://%{HTTP_HOST}%{REQUEST_URI} [L,R=301]
+    
+    # Redirect www to non-www (or vice versa)
+    # RewriteCond %{HTTP_HOST} ^www\.(.*)$ [NC]
+    # RewriteRule ^(.*)$ https://%1/$1 [R=301,L]
+</IfModule>
