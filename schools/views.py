@@ -84,9 +84,9 @@ def get_csrf_token(request):
 def spa_index(request):
     """
     Serve the React frontend index.html for all SPA routes.
-    Includes robust error handling and fallback mechanisms.
+    Tries multiple locations and provides detailed error information.
     """
-    cache_key = 'spa_index_html_v2'
+    cache_key = 'spa_index_html_v3'
     
     # 1. Try to get from cache first (safely)
     try:
@@ -94,86 +94,92 @@ def spa_index(request):
         if content:
             response = HttpResponse(content, content_type='text/html')
             response['X-Cache-Status'] = 'HIT'
-            # Add browser caching headers (cache for 5 minutes)
             response['Cache-Control'] = 'public, max-age=300'
             response['Vary'] = 'Accept-Encoding'
             return response
     except Exception as e:
-        logger.warning(f"Cache read error in spa_index: {str(e)}")
-        # Continue to load from disk if cache fails
+        logger.warning("Cache read error in spa_index: " + str(e))
 
-    # 2. If not in cache, try to load from disk
-    try:
-        # Resolve the index.html path - ensure BASE_DIR is converted to string for safety
-        base_dir_str = str(settings.BASE_DIR)
-        index_path = os.path.join(base_dir_str, 'frontend', 'dist', 'index.html')
-        
-        content = None
-        
-        if os.path.exists(index_path):
-            with open(index_path, 'r', encoding='utf-8') as f:
-                content = f.read()
-            
-            # Try to cache, but don't fail if caching fails
-            try:
-                cache.set(cache_key, content, 3600)
-            except Exception as e:
-                logger.warning(f"Cache write error in spa_index: {str(e)}")
-                
-            response = HttpResponse(content, content_type='text/html')
-            response['X-Cache-Status'] = 'MISS'
-            # Add browser caching headers (cache for 5 minutes)
-            response['Cache-Control'] = 'public, max-age=300'
-            response['Vary'] = 'Accept-Encoding'
-            return response
-            
-        # Fallback to finding it via Django's template engine
-        from django.template.loader import render_to_string
+    # 2. Try multiple possible locations for index.html
+    base_dir_str = str(settings.BASE_DIR)
+    
+    # List of possible paths to try
+    possible_paths = [
+        os.path.join(base_dir_str, 'frontend', 'dist', 'index.html'),
+        os.path.join(base_dir_str, 'staticfiles', 'index.html'),
+        os.path.join(settings.STATIC_ROOT, 'index.html') if settings.STATIC_ROOT else None,
+    ]
+    
+    # Remove None values
+    possible_paths = [p for p in possible_paths if p]
+    
+    content = None
+    found_path = None
+    
+    # Try each path
+    for index_path in possible_paths:
         try:
-            content = render_to_string('index.html')
-            # Cache fallback content too (safely)
-            try:
-                cache.set(cache_key, content, 300)
-            except Exception:
-                pass
-            return HttpResponse(content, content_type='text/html')
-        except Exception as template_err:
-            logger.error(f"Template load error: {template_err}")
-            # If template fails, raise to hit the main except block
-            raise template_err
-        
-    except Exception as e:
-        # Log the error for debugging
-        logger.error("Error serving SPA index: " + str(e))
-        
-        # Return a simple, safe error page without detailed traceback
-        # to avoid potential issues with string formatting
-        error_html = """
-        <html>
-            <head>
-                <title>Application Error</title>
-            </head>
-            <body style='font-family:sans-serif; text-align:center; padding-top:10vh;'>
-                <h1 style='color: #e53e3e;'>Application Loading Error</h1>
-                <p>The application could not be loaded. Please check the server logs for details.</p>
-                <p style='margin-top:30px;'>
-                    <button onclick="window.location.reload()" 
-                            style="padding:12px 24px; background:#4F46E5; color:white; 
-                                   border:none; border-radius:6px; cursor:pointer; 
-                                   font-size:16px;">
-                        Reload Page
-                    </button>
-                </p>
-                <p style='color:#718096; font-size:14px; margin-top:40px;'>
-                    If this problem persists, please contact your system administrator.
-                </p>
-            </body>
-        </html>
-        """
-        
-        response = HttpResponse(error_html, status=503)
-        response['Cache-Control'] = 'no-store, no-cache, must-revalidate, max-age=0'
+            if os.path.exists(index_path):
+                with open(index_path, 'r', encoding='utf-8') as f:
+                    content = f.read()
+                found_path = index_path
+                logger.info("Found index.html at: " + found_path)
+                break
+        except Exception as e:
+            logger.warning("Error reading " + index_path + ": " + str(e))
+            continue
+    
+    # If we found content, serve it
+    if content:
+        try:
+            cache.set(cache_key, content, 3600)
+        except Exception as e:
+            logger.warning("Cache write error: " + str(e))
+            
+        response = HttpResponse(content, content_type='text/html')
+        response['X-Cache-Status'] = 'MISS'
+        response['Cache-Control'] = 'public, max-age=300'
+        response['Vary'] = 'Accept-Encoding'
         return response
+    
+    # 3. Try Django template loader as fallback
+    try:
+        from django.template.loader import render_to_string
+        content = render_to_string('index.html')
+        try:
+            cache.set(cache_key, content, 300)
+        except Exception:
+            pass
+        response = HttpResponse(content, content_type='text/html')
+        response['Cache-Control'] = 'public, max-age=300'
+        return response
+    except Exception as template_err:
+        logger.error("Template load error: " + str(template_err))
+    
+    # 4. If all else fails, return a minimal working HTML that loads from static
+    logger.error("Could not find index.html in any location. Paths tried: " + str(possible_paths))
+    
+    # Return a minimal HTML that tries to load the app from static files
+    fallback_html = """<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>EduManage - School Management System</title>
+    <script>
+        // Try to load the main app from static files
+        window.location.href = '/static/index.html';
+    </script>
+</head>
+<body style="font-family: sans-serif; text-align: center; padding-top: 20vh;">
+    <h1>Loading EduManage...</h1>
+    <p>If this page doesn't redirect automatically, <a href="/static/index.html">click here</a>.</p>
+</body>
+</html>"""
+    
+    response = HttpResponse(fallback_html, content_type='text/html')
+    response['Cache-Control'] = 'no-store, no-cache, must-revalidate'
+    return response
 
 
 # Authentication Views
