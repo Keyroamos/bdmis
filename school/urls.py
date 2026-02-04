@@ -9,40 +9,40 @@ from django.conf.urls.static import static
 from django.http import FileResponse, HttpResponse
 import os
 
-def serve_manifest(request, filename='manifest.webmanifest'):
-    """Serve manifest files (.webmanifest or .json) with correct MIME type"""
-    # Determine which manifest file to serve
-    if filename.endswith('.json'):
-        manifest_filename = 'manifest.json'
-    else:
-        manifest_filename = 'manifest.webmanifest'
-    
-    # Try multiple locations
+def serve_static_file(request, filename, content_type):
+    """Serve specific static files with correct MIME type"""
     possible_paths = [
-        os.path.join(settings.BASE_DIR, 'staticfiles', manifest_filename),
-        os.path.join(settings.BASE_DIR, 'frontend', 'dist', manifest_filename),
+        os.path.join(settings.BASE_DIR, 'staticfiles', filename),
+        os.path.join(settings.BASE_DIR, 'frontend', 'dist', filename),
+        os.path.join(settings.BASE_DIR, 'static', filename),
     ]
     
     if settings.STATIC_ROOT:
-        possible_paths.append(os.path.join(settings.STATIC_ROOT, manifest_filename))
+        possible_paths.append(os.path.join(settings.STATIC_ROOT, filename))
     
-    manifest_path = None
+    file_path = None
     for path in possible_paths:
         if os.path.exists(path):
-            manifest_path = path
+            file_path = path
             break
     
-    if manifest_path:
+    if file_path:
         try:
-            with open(manifest_path, 'r', encoding='utf-8') as f:
+            with open(file_path, 'rb') as f:
                 content = f.read()
-            response = HttpResponse(content, content_type='application/manifest+json')
+            response = HttpResponse(content, content_type=content_type)
             response['Cache-Control'] = 'public, max-age=3600'
             return response
         except Exception as e:
-            return HttpResponse(f"Error reading manifest: {str(e)}", status=500)
+            return HttpResponse(f"Error reading file: {str(e)}", status=500)
     
-    return HttpResponse(f"Manifest file '{manifest_filename}' not found", status=404)
+    return HttpResponse(f"File '{filename}' not found", status=404)
+
+def serve_manifest(request, filename='manifest.webmanifest'):
+    return serve_static_file(request, filename, 'application/manifest+json')
+
+def serve_sw(request):
+    return serve_static_file(request, 'sw.js', 'application/javascript')
 
 urlpatterns = [
     path('admin/', admin.site.urls),
@@ -59,12 +59,14 @@ if settings.DEBUG:
     urlpatterns += static(settings.STATIC_URL, document_root=settings.STATIC_ROOT)
     urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
 
-# Serve manifest files with correct MIME type (MUST be before catch-all)
+# Serve manifest and service worker files with correct MIME type (MUST be before catch-all)
 urlpatterns += [
     path('static/manifest.webmanifest', serve_manifest, name='manifest-webmanifest'),
     path('static/manifest.json', serve_manifest, {'filename': 'manifest.json'}, name='manifest-json'),
+    path('static/sw.js', serve_sw, name='service-worker'),
     re_path(r'^manifest\.webmanifest$', serve_manifest, name='manifest-webmanifest-root'),
     re_path(r'^manifest\.json$', serve_manifest, {'filename': 'manifest.json'}, name='manifest-json-root'),
+    re_path(r'^sw\.js$', serve_sw, name='service-worker-root'),
 ]
 
 # Catch-all for React frontend (MUST be last)

@@ -120,7 +120,6 @@ DATABASES = {
         'CONN_MAX_AGE': 0,  # Ensure connections are closed immediately to save memory
         'OPTIONS': {
             'timeout': 30,  # Increase timeout for busy periods
-            'transaction_mode': 'IMMEDIATE', # Better handling for concurrent writes
         },
     }
 }

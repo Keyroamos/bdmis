@@ -13,10 +13,13 @@
 - **Fix 2**: Memory optimization & Garbage Collection in `passenger_wsgi.py`.
 - **Fix 3**: Process limiting in `.htaccess` (set to 1 worker for stability).
 
-### 3. ✅ Performance Optimization
-- **Problem**: Slow response times, high memory usage
-- **Fix**: Database connection pooling, cache optimization
-- **Files**: `school/settings.py`
+### 3. ✅ Database Fix (CRITICAL)
+- **Problem**: `TypeError: 'transaction_mode' is an invalid keyword argument`.
+- **Fix**: Removed incompatible `transaction_mode` from `settings.py`. This was causing the 500 Internal Server Error.
+
+### 4. ✅ Service Worker & Manifest
+- **Problem**: 500 errors when loading `sw.js` or `manifest.webmanifest`.
+- **Fix**: Added dedicated routes for both files in `school/urls.py` with correct MIME types.
 
 ---
 
