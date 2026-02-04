@@ -137,25 +137,30 @@ def spa_index(request):
             raise template_err
         
     except Exception as e:
-        logger.error(f"Error serving SPA index: {str(e)}")
-        import traceback
-        tb = traceback.format_exc()
+        # Log the error for debugging
+        logger.error("Error serving SPA index: " + str(e))
         
-        # Return a more descriptive error page for debugging (in production this might be generic)
-        # But for now, user needs to get rid of the "stuck" page.
-        # If we are here, it means we genuinely CANNOT load the index.html.
-        
-        error_html = f"""
+        # Return a simple, safe error page without detailed traceback
+        # to avoid potential issues with string formatting
+        error_html = """
         <html>
+            <head>
+                <title>Application Error</title>
+            </head>
             <body style='font-family:sans-serif; text-align:center; padding-top:10vh;'>
-                <h1 style='color: #e53e3e;'>System Initialization Error</h1>
-                <p>We could not load the application interface.</p>
-                <div style='text-align:left; max-width:800px; margin:0 auto; background:#f7fafc; padding:20px; border-radius:8px; overflow:auto;'>
-                    <p><strong>Error Details:</strong> {str(e)}</p>
-                    <pre>{tb}</pre>
-                </div>
-                <p>Please contact support if this persists.</p>
-                <button onclick="window.location.reload()" style="padding:10px 20px; background:#4F46E5; color:white; border:none; border-radius:5px; cursor:pointer; margin-top:20px;">Try Again</button>
+                <h1 style='color: #e53e3e;'>Application Loading Error</h1>
+                <p>The application could not be loaded. Please check the server logs for details.</p>
+                <p style='margin-top:30px;'>
+                    <button onclick="window.location.reload()" 
+                            style="padding:12px 24px; background:#4F46E5; color:white; 
+                                   border:none; border-radius:6px; cursor:pointer; 
+                                   font-size:16px;">
+                        Reload Page
+                    </button>
+                </p>
+                <p style='color:#718096; font-size:14px; margin-top:40px;'>
+                    If this problem persists, please contact your system administrator.
+                </p>
             </body>
         </html>
         """

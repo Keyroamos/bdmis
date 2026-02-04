@@ -1,16 +1,24 @@
 import sys
 import os
 
-# INTERP is the path to the python interpreter in your virtualenv
-# Derived from: /home/bdmiscok/virtualenv/public_html/nedbdmis/3.9/bin/activate
-INTERP = "/home/bdmiscok/virtualenv/public_html/nedbdmis/3.9/bin/python"
-
-# Check if we are running the correct interpreter, if not, restart with the correct one
-if sys.executable != INTERP:
-    os.execl(INTERP, INTERP, *sys.argv)
-
-# Add the project directory to the sys.path
+# Add your project directory to the sys.path
 sys.path.insert(0, os.path.dirname(__file__))
+
+# Activate virtualenv by adding its site-packages to sys.path
+# This is safer than using os.execl which can cause issues with Passenger
+VIRTUALENV = '/home/bdmiscok/virtualenv/public_html/nedbdmis/3.9'
+activate_this = os.path.join(VIRTUALENV, 'bin', 'activate_this.py')
+
+# Try to activate using activate_this.py if it exists
+if os.path.exists(activate_this):
+    with open(activate_this) as f:
+        exec(f.read(), {'__file__': activate_this})
+else:
+    # Fallback: manually add site-packages to path
+    import site
+    site.addsitedir(os.path.join(VIRTUALENV, 'lib', 'python3.9', 'site-packages'))
+
+
 
 # Set the Django settings module
 os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'school.settings')
