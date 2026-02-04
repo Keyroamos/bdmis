@@ -32,9 +32,10 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 SECRET_KEY = os.environ.get('SECRET_KEY', 'django-insecure-d8tc3m9u-r3=!4bdc^it^k*-dvqqkh^+&(7d$=61&4nb-g&vsx')
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = os.environ.get('DEBUG', 'True') == 'True'
+# IMPORTANT: When True, Django stores ALL SQL queries in memory which will crash shared hosting!
+DEBUG = os.environ.get('DEBUG', 'False') == 'True'
 
-ALLOWED_HOSTS = os.environ.get('ALLOWED_HOSTS', '*').split(',') if os.environ.get('ALLOWED_HOSTS') else [
+ALLOWED_HOSTS = [
     'auth-system.bdmis.co.ke',
     'edumanage.bdmis.co.ke',
     'www.edumanage.bdmis.co.ke',
@@ -42,8 +43,12 @@ ALLOWED_HOSTS = os.environ.get('ALLOWED_HOSTS', '*').split(',') if os.environ.ge
     'www.uniqo.top',
     'localhost',
     '127.0.0.1',
-    '*'
 ]
+
+# Add any additional hosts from environment
+if os.environ.get('ALLOWED_HOSTS'):
+    ALLOWED_HOSTS.extend(os.environ.get('ALLOWED_HOSTS').split(','))
+
 
 
 # Application definition
@@ -112,10 +117,11 @@ DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.sqlite3',
         'NAME': BASE_DIR / 'db.sqlite3',
-        'CONN_MAX_AGE': 0,  # Close connections immediately (prevents locking and reduces memory)
+        'CONN_MAX_AGE': 0,  # Ensure connections are closed immediately to save memory
         'OPTIONS': {
-            'timeout': 20,  # Timeout for database locks (seconds)
-        }
+            'timeout': 30,  # Increase timeout for busy periods
+            'transaction_mode': 'IMMEDIATE', # Better handling for concurrent writes
+        },
     }
 }
 

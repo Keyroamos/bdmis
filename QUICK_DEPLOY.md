@@ -7,10 +7,11 @@
 - **Fix**: Added dedicated routes in `school/urls.py` with correct MIME type
 - **Files**: `school/urls.py`
 
-### 2. ✅ Child Process Crashes
-- **Problem**: Worker processes being killed (Signal 15)
-- **Fix**: Memory optimization, garbage collection, process limits
-- **Files**: `passenger_wsgi.py`, `.htaccess`, `school/settings.py`
+### 2. ✅ Child Process Crashes (CRITICAL)
+- **Problem**: Worker processes being killed (Signal 15) because of memory exhaustion.
+- **Fix 1**: **DEBUG = False** (Mandatory). DEBUG mode stored every database query in memory, causing processes to grow until they crashed.
+- **Fix 2**: Memory optimization & Garbage Collection in `passenger_wsgi.py`.
+- **Fix 3**: Process limiting in `.htaccess` (set to 1 worker for stability).
 
 ### 3. ✅ Performance Optimization
 - **Problem**: Slow response times, high memory usage

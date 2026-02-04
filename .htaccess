@@ -15,45 +15,39 @@ PassengerPython /home/bdmiscok/virtualenv/public_html/nedbdmis/3.9/bin/python3.9
 PassengerMinInstances 1
 
 # Maximum number of application instances
-# Keep this low to prevent memory exhaustion on shared hosting
-PassengerMaxPoolSize 2
+# Keep this at 1 for maximum stability on shared hosting with low memory
+PassengerMaxPoolSize 1
 
 # Maximum number of requests a process will handle before being recycled
-# Helps prevent memory leaks from accumulating
-PassengerMaxRequests 500
+# Low values (200-500) prevent memory leaks from killing the server
+PassengerMaxRequests 300
 
 # Maximum time (in seconds) a request can take before being killed
-# Prevents long-running requests from blocking the server
-PassengerMaxRequestTime 30
+PassengerMaxRequestTime 60
 
 # Maximum memory (in MB) a process can use before being recycled
-PassengerMemoryLimit 512
+PassengerMemoryLimit 384
 
 # Throttle stat() calls to reduce I/O overhead
-PassengerStatThrottleRate 5
+PassengerStatThrottleRate 10
 
 # Spawn Method
-# 'direct' is more stable for Django applications on shared hosting
 PassengerSpawnMethod direct
 
 # Startup File
 PassengerStartupFile passenger_wsgi.py
 
 # Logging Configuration
-# ---------------------
-
-# Log level: 0 (least verbose) to 7 (most verbose)
-# Use 3 for production, 5+ for debugging
-PassengerLogLevel 3
-
-# Custom log file location
+PassengerLogLevel 1
 PassengerDebugLogFile /home/bdmiscok/logs/passenger.log
 
 # Application Environment
-# -----------------------
-
-# Set to 'production' for production servers
 PassengerAppEnv production
+
+# Explicitly set key environment variables
+SetEnv DEBUG False
+SetEnv DJANGO_SETTINGS_MODULE school.settings
+
 
 # Error Documents
 # ---------------
