@@ -22,6 +22,16 @@ else:
 # Set the Django settings module
 os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'school.settings')
 
+# Load environment variables explicitly for Passenger/cPanel
+try:
+    from dotenv import load_dotenv
+    project_root = os.path.dirname(__file__)
+    env_path = os.path.join(project_root, '.env')
+    if os.path.exists(env_path):
+        load_dotenv(env_path)
+except ImportError:
+    pass
+
 # Enable garbage collection optimization to reduce memory usage
 # Lower thresholds = more frequent GC = less memory buildup
 gc.set_threshold(700, 10, 10)
