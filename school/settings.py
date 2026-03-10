@@ -131,7 +131,7 @@ SUPABASE_DB_HOST = os.environ.get(
 )
 SUPABASE_DB_NAME     = os.environ.get('SUPABASE_DB_NAME',     'postgres')
 SUPABASE_DB_USER     = os.environ.get('SUPABASE_DB_USER',     'postgres.ouwwhqebjrkojesuyfvv')
-SUPABASE_DB_PASSWORD = os.environ.get('SUPABASE_DB_PASSWORD', '')   # <-- Set this in .env!
+SUPABASE_DB_PASSWORD = os.environ.get('SUPABASE_DB_PASSWORD', '9260@Keyro20')   # <-- Set in .env, fallback to current password
 SUPABASE_DB_PORT     = os.environ.get('SUPABASE_DB_PORT',     '5432')  # Supavisor session port
 
 DATABASES = {
