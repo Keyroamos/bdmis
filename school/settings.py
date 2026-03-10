@@ -110,19 +110,44 @@ TEMPLATES = [
 WSGI_APPLICATION = 'school.wsgi.application'
 
 
-# Database
+# Database - Supabase (PostgreSQL)
 # https://docs.djangoproject.com/en/5.1/ref/settings/#databases
+#
+# Supabase connection details:
+#   Project URL : https://ouwwhqebjrkojesuyfvv.supabase.co
+#   Anon Key   : stored in SUPABASE_ANON_KEY env variable
+#   DB password: set SUPABASE_DB_PASSWORD in your .env / cPanel env vars
+#
+# Connection string: postgresql://postgres.[ref]:[password]@aws-0-eu-central-1.pooler.supabase.com:6543/postgres
+
+SUPABASE_DB_HOST = os.environ.get(
+    'SUPABASE_DB_HOST',
+    'aws-1-eu-west-1.pooler.supabase.com'  # Session-mode pooler
+)
+SUPABASE_DB_NAME     = os.environ.get('SUPABASE_DB_NAME',     'postgres')
+SUPABASE_DB_USER     = os.environ.get('SUPABASE_DB_USER',     'postgres.ouwwhqebjrkojesuyfvv')
+SUPABASE_DB_PASSWORD = os.environ.get('SUPABASE_DB_PASSWORD', '')   # <-- Set this in .env!
+SUPABASE_DB_PORT     = os.environ.get('SUPABASE_DB_PORT',     '5432')  # Supavisor session port
 
 DATABASES = {
     'default': {
-        'ENGINE': 'django.db.backends.sqlite3',
-        'NAME': BASE_DIR / 'db.sqlite3',
-        'CONN_MAX_AGE': 0,  # Ensure connections are closed immediately to save memory
+        'ENGINE': 'django.db.backends.postgresql',
+        'NAME':     SUPABASE_DB_NAME,
+        'USER':     SUPABASE_DB_USER,
+        'PASSWORD': SUPABASE_DB_PASSWORD,
+        'HOST':     SUPABASE_DB_HOST,
+        'PORT':     SUPABASE_DB_PORT,
+        'CONN_MAX_AGE': 60,           # Keep connections alive for 60s (pooler-safe)
         'OPTIONS': {
-            'timeout': 30,  # Increase timeout for busy periods
+            'sslmode': 'require',     # Supabase requires SSL
+            'connect_timeout': 30,
         },
     }
 }
+
+# Supabase client settings (for direct API usage from Python code)
+SUPABASE_URL      = os.environ.get('SUPABASE_URL',      'https://ouwwhqebjrkojesuyfvv.supabase.co')
+SUPABASE_ANON_KEY = os.environ.get('SUPABASE_ANON_KEY', 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im91d3docWVianJrb2plc3V5ZnZ2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzMwODI3MDUsImV4cCI6MjA4ODY1ODcwNX0.NlcsvSsA0V-nolUnhJ1OtFpgoCQb04fdJRoWS4oaXu4')
 
 
 # Password validation
