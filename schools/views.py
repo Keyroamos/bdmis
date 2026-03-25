@@ -707,10 +707,10 @@ def api_student_create(request):
                     elif current_term == 3: tuition_fee = student.grade.term3_fees
 
                 if tuition_fee > 0:
-                    # Create the BILL (Invoice) for the term
+                    # Create the INVOICE for the term
                     Transaction.objects.get_or_create(
                         account=finance_account,
-                        type='BILL',
+                        type='INVOICE',
                         amount=tuition_fee,
                         description=f"Term {current_term} Tuition Fees - {student.admission_number}",
                         reference=f"INV-{current_term}-{student.admission_number}",

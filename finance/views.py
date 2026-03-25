@@ -3,8 +3,8 @@ from django.http import JsonResponse, HttpResponse
 from django.views.decorators.http import require_http_methods
 from django.views.decorators.csrf import csrf_exempt
 from django.contrib.auth.decorators import login_required
-from django.db.models import Sum, Q, Count
-from django.db.models.functions import TruncMonth, TruncDate
+from django.db.models import Sum, Q, Count, Value, DecimalField
+from django.db.models.functions import TruncMonth, TruncDate, Coalesce
 from django.utils import timezone
 import datetime
 import json
@@ -57,9 +57,23 @@ def api_finance_dashboard(request):
         net_profit = collected - total_expenses
         
         # KPIs
-        expected = float(total_billed)
-        pending = float(outstanding)
-        rate = round((float(fees_income) / expected * 100), 1) if expected > 0 else 0
+        # Aggregate from all financial modules for total expected
+        total_fees_expected = float(total_billed) # Start with general fees
+        
+        transport_expected = TransportStudentAccount.objects.aggregate(
+            sum=Coalesce(Sum('total_billed'), Value(0), output_field=DecimalField())
+        )['sum'] or 0
+        
+        food_expected = FoodStudentAccount.objects.aggregate(
+            sum=Coalesce(Sum('total_billed'), Value(0), output_field=DecimalField())
+        )['sum'] or 0
+
+        total_fees_expected += float(transport_expected) + float(food_expected)
+        
+        # Recalculate collection rate and outstanding with complete data
+        # 'collected' is the total income from all sources
+        outstanding = float(total_fees_expected) - collected
+        collection_rate = (collected / total_fees_expected * 100) if total_fees_expected > 0 else 0
         
         # Runway (Monthly Burn Proxy)
         # Using avg expenses over known records, or fallback to fixed division
@@ -82,6 +96,10 @@ def api_finance_dashboard(request):
         monthly_exp = Expense.objects.filter(date__gte=six_months_ago)\
             .annotate(month=TruncMonth('date'))\
             .values('month').annotate(total=Sum('amount'))
+
+        monthly_food = FoodTransaction.objects.filter(type='PAYMENT', date__gte=six_months_ago)\
+            .annotate(month=TruncMonth('date'))\
+            .values('month').annotate(total=Sum('amount'))
         
         chart_data_map = {}
         def add_to_chart(qs, key):
@@ -93,6 +111,7 @@ def api_finance_dashboard(request):
 
         add_to_chart(monthly_fees, 'revenue')
         add_to_chart(monthly_transport, 'revenue')
+        add_to_chart(monthly_food, 'revenue')
         add_to_chart(monthly_exp, 'expenses')
         
         chart_data = sorted(list(chart_data_map.values()), key=lambda x: datetime.datetime.strptime(x['month'], '%b'))
@@ -127,9 +146,9 @@ def api_finance_dashboard(request):
                 'food_income': total_food_income,
                 'total_expenses': total_expenses,
                 'net_profit': net_profit,
-                'expected_fees': expected,
-                'fees_arrears': pending,
-                'collection_rate': rate,
+                'expected_fees': total_fees_expected,
+                'fees_arrears': outstanding,
+                'collection_rate': collection_rate,
                 'runway': runway,
                 'expense_breakdown': {
                     'salaries': float(salary_expenses),
@@ -856,6 +875,11 @@ def api_student_fee_summary(request):
         total_students = Student.objects.count()
         accounts = StudentFinanceAccount.objects.all()
 
+        total_fees_expected = Student.objects.aggregate(
+            sum=Coalesce(Sum('term1_fees'), Value(0), output_field=DecimalField()) + 
+                Coalesce(Sum('term2_fees'), Value(0), output_field=DecimalField()) + 
+                Coalesce(Sum('term3_fees'), Value(0), output_field=DecimalField())
+        )['sum'] or 0
         debtors_count = accounts.filter(balance__gt=0).count()
         credit_count = accounts.filter(balance__lt=0).count()
         settled_count = accounts.filter(balance=0).count()
