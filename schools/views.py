@@ -680,7 +680,7 @@ def api_student_create(request):
                 if not ref_number:
                      ref_number = f'REF-{uuid.uuid4().hex[:8].upper()}'
                 
-                # Create Payment Record
+                # Create Admin Fee Payment Record (Main app stats)
                 Payment.objects.create(
                     student=student,
                     amount=amount,
@@ -690,6 +690,32 @@ def api_student_create(request):
                     term=student.current_term or 1,
                     status='COMPLETED' if payment_method == 'CASH' else 'PENDING'
                 )
+
+                # --- FINANCE INTEGRATION: Automatic Tuition Billing ---
+                from finance.models import StudentFinanceAccount, Transaction
+                from django.utils import timezone
+                
+                # Get or create finance account
+                finance_account, _ = StudentFinanceAccount.objects.get_or_create(student=student)
+                
+                # Determine tuition fee based on grade and current term
+                current_term = student.current_term or 1
+                tuition_fee = 0
+                if student.grade:
+                    if current_term == 1: tuition_fee = student.grade.term1_fees
+                    elif current_term == 2: tuition_fee = student.grade.term2_fees
+                    elif current_term == 3: tuition_fee = student.grade.term3_fees
+
+                if tuition_fee > 0:
+                    # Create the BILL (Invoice) for the term
+                    Transaction.objects.get_or_create(
+                        account=finance_account,
+                        type='BILL',
+                        amount=tuition_fee,
+                        description=f"Term {current_term} Tuition Fees - {student.admission_number}",
+                        reference=f"INV-{current_term}-{student.admission_number}",
+                        date=timezone.now().date(),
+                    )
                 
                 return JsonResponse({
                     'success': True, 
