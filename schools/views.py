@@ -369,7 +369,9 @@ def api_grades(request):
         } for g in grades]
         return JsonResponse({'grades': data})
     except Exception as e:
-        return JsonResponse({'error': str(e)}, status=500)
+        import traceback
+        traceback.print_exc()
+        return JsonResponse({'error': str(e), 'traceback': traceback.format_exc()}, status=500)
 
 @csrf_exempt
 @require_http_methods(["POST"])
