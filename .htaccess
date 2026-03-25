@@ -79,6 +79,23 @@ ErrorDocument 500 /500.html
     AddOutputFilterByType DEFLATE text/html text/plain text/xml text/css text/javascript application/javascript application/json
 </IfModule>
 
+# Static File Serving (Bypass Passenger for performance and stability)
+# -------------------------------------------------------------
+<IfModule mod_rewrite.c>
+    RewriteEngine On
+    
+    # Direct serving of static files from staticfiles/ directory
+    RewriteCond %{DOCUMENT_ROOT}/staticfiles/$1 -f
+    RewriteRule ^static/(.*)$ staticfiles/$1 [L]
+    
+    # Direct serving of manifest/sw from root if they exist in staticfiles
+    RewriteCond %{DOCUMENT_ROOT}/staticfiles/manifest.webmanifest -f
+    RewriteRule ^manifest.webmanifest$ staticfiles/manifest.webmanifest [L]
+    
+    RewriteCond %{DOCUMENT_ROOT}/staticfiles/sw.js -f
+    RewriteRule ^sw.js$ staticfiles/sw.js [L]
+</IfModule>
+
 # Browser Caching
 # ---------------
 

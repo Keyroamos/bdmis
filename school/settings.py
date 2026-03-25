@@ -361,6 +361,8 @@ STATICFILES_STORAGE = 'django.contrib.staticfiles.storage.StaticFilesStorage'
 WHITENOISE_USE_FINDERS = True  # Allow WhiteNoise to use Django's staticfiles finders
 WHITENOISE_AUTOREFRESH = True if DEBUG else False  # Auto-refresh in development
 WHITENOISE_MAX_AGE = 31536000 if not DEBUG else 0  # Cache for 1 year in production
+WHITENOISE_MANIFEST_STRICT = False # Prevent 500 error if file not in manifest
+WHITENOISE_KEEP_ONLY_HASHED_FILES = False # Keep original files
 
 # Caching Configuration
 # Using FileBasedCache to avoid SQLite locking issues on cPanel
