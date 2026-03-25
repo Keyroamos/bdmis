@@ -9,7 +9,7 @@ from django.utils import timezone
 import datetime
 import json
 from .models import StudentFinanceAccount, Transaction, FeeStructure
-from schools.models import Student, Expense, TransportFee, FoodFee, StudentMealPayment
+from schools.models import Student, Payment, Expense, TransportFee, FoodFee, StudentMealPayment
 from transport.models import TransportExpense, TransportTransaction, TransportStudentAccount, Route, TransportAssignment
 from food.models import FoodTransaction, FoodStudentAccount, MealItem, FoodSubscription
 
@@ -20,7 +20,10 @@ def api_finance_dashboard(request):
         # 1. Income Breakdown
         # -------------------
         # Fees Income (General Tuition/Fees)
-        fees_income = Transaction.objects.filter(type='PAYMENT').aggregate(sum=Sum('amount'))['sum'] or 0
+        # We aggregate from both the new Transaction model and the legacy schools.Payment model
+        fees_income_modern = Transaction.objects.filter(type='PAYMENT').aggregate(sum=Sum('amount'))['sum'] or 0
+        fees_income_legacy = Payment.objects.filter(status='COMPLETED').aggregate(sum=Sum('amount'))['sum'] or 0
+        total_fees_income = float(fees_income_modern) + float(fees_income_legacy)
         
         # Transport Income
         # We check both TransportFee (Legacy/Schools model) and TransportTransaction (Transport app model)
@@ -38,7 +41,7 @@ def api_finance_dashboard(request):
         total_food_income = float(food_income_fee) + float(food_income_meal) + float(food_income_modern)
         
         # Total Realized Revenue (Total Cash Collected)
-        collected = float(fees_income) + total_transport_income + total_food_income
+        collected = total_fees_income + total_transport_income + total_food_income
         
         # Arrears & Expected (Mainly from Fees Account)
         total_billed = StudentFinanceAccount.objects.aggregate(sum=Sum('total_billed'))['sum'] or 0
@@ -79,6 +82,7 @@ def api_finance_dashboard(request):
         # Using avg expenses over known records, or fallback to fixed division
         burn_rate = total_expenses / 3 if total_expenses > 0 else 1 
         runway = round(collected / burn_rate, 1) if burn_rate > 0 else 0
+        total_students = Student.objects.count()
 
         # 3. Chart Data (Monthly Trend)
         # -----------------------------
@@ -141,17 +145,21 @@ def api_finance_dashboard(request):
         return JsonResponse({
             'debug_counts': {
                 'payment_count': Transaction.objects.filter(type='PAYMENT').count(),
+                'legacy_payment_count': Payment.objects.filter(status='COMPLETED').count(),
                 'student_count': Student.objects.count(),
                 'account_count': StudentFinanceAccount.objects.count(),
                 'billed_account_count': StudentFinanceAccount.objects.filter(total_billed__gt=0).count(),
             },
             'summary': {
                 'total_revenue': collected,
-                'fees_income': float(fees_income),
+                'fees_income': total_fees_income,
                 'transport_income': total_transport_income,
                 'food_income': total_food_income,
                 'total_expenses': total_expenses,
                 'net_profit': net_profit,
+                'total_billed': float(total_billed),
+                'outstanding': float(outstanding),
+                'total_students': total_students,
                 'expected_fees': total_fees_expected,
                 'fees_arrears': outstanding,
                 'collection_rate': collection_rate,
