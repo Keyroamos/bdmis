@@ -121,7 +121,7 @@ const Finance = () => {
     const fetchFinanceData = async () => {
         setLoading(true);
         try {
-            const response = await axios.get('/api/finance/');
+            const response = await axios.get('/api/finance/dashboard/');
             setData(response.data);
         } catch (error) {
             console.error('Error fetching finance:', error);
