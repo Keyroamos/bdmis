@@ -139,6 +139,12 @@ def api_finance_dashboard(request):
         } for ex in recent_expenses]
 
         return JsonResponse({
+            'debug_counts': {
+                'payment_count': Transaction.objects.filter(type='PAYMENT').count(),
+                'student_count': Student.objects.count(),
+                'account_count': StudentFinanceAccount.objects.count(),
+                'billed_account_count': StudentFinanceAccount.objects.filter(total_billed__gt=0).count(),
+            },
             'summary': {
                 'total_revenue': collected,
                 'fees_income': float(fees_income),
