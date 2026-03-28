@@ -36,9 +36,20 @@ except ImportError:
 # Lower thresholds = more frequent GC = less memory buildup
 gc.set_threshold(700, 10, 10)
 
-from django.core.wsgi import get_wsgi_application
-application = get_wsgi_application()
+try:
+    from django.core.wsgi import get_wsgi_application
+    application = get_wsgi_application()
+    
+    # Force garbage collection after initialization
+    gc.collect()
+except Exception as e:
+    # Log initialization errors to a visible file for debugging on cPanel
+    import traceback
+    with open(os.path.join(os.path.dirname(__file__), 'wsgi_init_error.log'), 'a') as f:
+        f.write("\n" + "="*50 + "\n")
+        f.write(f"Startup Error at {gc.get_threshold()}\n")
+        f.write(f"Error: {str(e)}\n")
+        f.write(traceback.format_exc())
+    raise e
 
-# Force garbage collection after initialization
-gc.collect()
 
