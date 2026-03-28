@@ -1488,6 +1488,15 @@ def api_school_config(request):
         from config.models import SchoolConfig
         config = SchoolConfig.get_config()
         
+        # Safe URL generation
+        logo_url = None
+        if config.school_logo:
+             try:
+                 logo_url = request.build_absolute_uri(config.school_logo.url)
+             except Exception as logo_err:
+                 logger.warning(f"Could not generate absolute logo URL: {str(logo_err)}")
+                 logo_url = config.school_logo.url # Fallback to relative
+        
         return JsonResponse({
             'config': {
                 'school_name': config.school_name,
@@ -1495,7 +1504,7 @@ def api_school_config(request):
                 'school_email': config.school_email,
                 'school_phone': config.school_phone,
                 'school_address': config.school_address,
-                'school_logo': request.build_absolute_uri(config.school_logo.url) if config.school_logo else None,
+                'school_logo': logo_url,
                 'admission_number_format': config.admission_number_format,
                 'admission_counter': config.admission_counter,
                 'current_term': config.current_term,
@@ -1504,7 +1513,9 @@ def api_school_config(request):
             }
         })
     except Exception as e:
+        logger.error(f"Error in api_school_config: {str(e)}\n{traceback.format_exc()}")
         return JsonResponse({'error': str(e)}, status=500)
+
 
 @csrf_exempt
 @require_http_methods(["POST"])

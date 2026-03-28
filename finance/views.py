@@ -8,6 +8,11 @@ from django.db.models.functions import TruncMonth, TruncDate, Coalesce
 from django.utils import timezone
 import datetime
 import json
+import logging
+import traceback
+
+logger = logging.getLogger(__name__)
+
 from .models import StudentFinanceAccount, Transaction, FeeStructure
 from schools.models import Student, Payment, Expense, TransportFee, FoodFee, StudentMealPayment
 from transport.models import TransportExpense, TransportTransaction, TransportStudentAccount, Route, TransportAssignment
@@ -176,8 +181,7 @@ def api_finance_dashboard(request):
             'recent_expenses': exp_data
         })
     except Exception as e:
-        import traceback
-        print(traceback.format_exc())
+        logger.error(f"Error in api_finance_dashboard: {str(e)}\n{traceback.format_exc()}")
         return JsonResponse({'error': str(e)}, status=500)
 
 from .models import SalaryStructure, PayrollRecord
@@ -200,6 +204,7 @@ def api_fee_structures(request):
             })
         return JsonResponse({'fee_structures': data})
     except Exception as e:
+        logger.error(f"Error in api_fee_structures: {str(e)}\n{traceback.format_exc()}")
         return JsonResponse({'error': str(e)}, status=500)
 
 @csrf_exempt

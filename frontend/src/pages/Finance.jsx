@@ -256,19 +256,24 @@ const Finance = () => {
                                 <h3 className="text-lg font-bold text-slate-900 dark:text-white mb-1">Expenses</h3>
                                 <p className="text-xs font-medium text-slate-500 mb-6">By Category</p>
                                 <div className="h-64 relative w-full mb-6">
-                                    <ResponsiveContainer width="100%" height="100%" minWidth={0}>
-                                        <PieChart>
-                                            <Pie data={expenseDistribution} innerRadius={60} outerRadius={80} paddingAngle={4} dataKey="value" cornerRadius={4}>
-                                                {expenseDistribution.map((entry, index) => <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />)}
-                                            </Pie>
-                                            <Tooltip />
-                                        </PieChart>
-                                    </ResponsiveContainer>
+                                    {expenseDistribution.length > 0 ? (
+                                        <ResponsiveContainer width="100%" height="100%" minWidth={0}>
+                                            <PieChart>
+                                                <Pie data={expenseDistribution} innerRadius={60} outerRadius={80} paddingAngle={4} dataKey="value" cornerRadius={4}>
+                                                    {expenseDistribution.map((entry, index) => <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />)}
+                                                </Pie>
+                                                <Tooltip />
+                                            </PieChart>
+                                        </ResponsiveContainer>
+                                    ) : (
+                                        <div className="h-full w-full flex items-center justify-center text-slate-400 font-medium text-sm">No data available</div>
+                                    )}
                                     <div className="absolute inset-0 flex items-center justify-center flex-col pointer-events-none">
                                         <span className="text-[10px] font-bold text-slate-400 uppercase">Total</span>
                                         <span className="text-xl font-bold text-slate-900 dark:text-white">{(totalExpenses / 1000).toFixed(0)}k</span>
                                     </div>
                                 </div>
+
                                 <div className="space-y-3">
                                     {(expenseDistribution || []).map((item, idx) => (
                                         <div key={idx} className="flex justify-between items-center text-xs font-medium">
