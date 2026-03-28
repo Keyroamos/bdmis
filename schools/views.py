@@ -327,7 +327,7 @@ def api_student_list(request):
             'grade': s.grade.name if s.grade else 'N/A',
             'gender': s.gender,
             'parent_phone': s.parent_phone,
-            'balance': float(s.balance_annot),
+            'balance': float(s.balance_annot or 0),
             'status': 'ACTIVE',
             'photo': s.photo.url if s.photo else None,
             'branch': s.branch.name if s.branch else 'N/A'
@@ -363,9 +363,9 @@ def api_grades(request):
             'id': g.id, 
             'name': g.name, 
             'class_teacher_id': g.class_teacher.id if g.class_teacher else None,
-            'term1_fees': float(g.term1_fees),
-            'term2_fees': float(g.term2_fees),
-            'term3_fees': float(g.term3_fees),
+            'term1_fees': float(g.term1_fees or 0),
+            'term2_fees': float(g.term2_fees or 0),
+            'term3_fees': float(g.term3_fees or 0),
         } for g in grades]
         return JsonResponse({'grades': data})
     except Exception as e:

@@ -547,16 +547,16 @@ class Student(models.Model):
         """Get current overall balance"""
         # Calculate total fees applicable up to current term
         owed = 0
-        if self.current_term >= 1: owed += self.term1_fees
-        if self.current_term >= 2: owed += self.term2_fees
-        if self.current_term >= 3: owed += self.term3_fees
+        if getattr(self, 'current_term', 0) >= 1: owed += (self.term1_fees or 0)
+        if getattr(self, 'current_term', 0) >= 2: owed += (self.term2_fees or 0)
+        if getattr(self, 'current_term', 0) >= 3: owed += (self.term3_fees or 0)
         
-        paid = self.get_total_paid()
+        paid = self.get_total_paid() or 0
         return owed - paid
 
     def get_total_fees(self):
-        """Get total fees for current academic year"""
-        return self.term1_fees + self.term2_fees + self.term3_fees
+        """Get total expected fees across all terms"""
+        return (getattr(self, 'term1_fees', 0) or 0) + (getattr(self, 'term2_fees', 0) or 0) + (getattr(self, 'term3_fees', 0) or 0)
     
     def get_paid_amount(self):
         """Get total amount paid for current academic year"""
@@ -584,13 +584,13 @@ class Student(models.Model):
     def get_term_balance(self, term):
         """Get balance for specific term"""
         if term == 1:
-            term_fee = self.term1_fees
+            term_fee = getattr(self, 'term1_fees', 0) or 0
         elif term == 2:
-            term_fee = self.term2_fees
+            term_fee = getattr(self, 'term2_fees', 0) or 0
         else:
-            term_fee = self.term3_fees
+            term_fee = getattr(self, 'term3_fees', 0) or 0
         
-        term_paid = self.get_term_paid_amount(term)
+        term_paid = self.get_term_paid_amount(term) or 0
         return term_fee - term_paid
     
     def get_total_balance(self):
