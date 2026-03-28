@@ -133,10 +133,12 @@ if SUPABASE_DB_HOST:
             'PASSWORD': SUPABASE_DB_PASSWORD,
             'HOST':     SUPABASE_DB_HOST,
             'PORT':     SUPABASE_DB_PORT,
-            'CONN_MAX_AGE': 60,
+            # CONN_MAX_AGE=0: Don't persist connections — required for transaction mode pooler
+            'CONN_MAX_AGE': 0,
             'OPTIONS': {
                 'sslmode': 'require',
-                'connect_timeout': 30,
+                # Fail fast — don't block the request for 30s before giving up
+                'connect_timeout': 10,
             },
         }
     }

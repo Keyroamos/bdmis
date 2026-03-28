@@ -13,6 +13,22 @@ import logging
 logger = logging.getLogger(__name__)
 
 
+def api_login_required(view_func):
+    """
+    For API endpoints: returns JSON 401 if user is not authenticated
+    instead of redirecting to the HTML login page (which breaks Axios).
+    """
+    @wraps(view_func)
+    def wrapper(request, *args, **kwargs):
+        if not request.user.is_authenticated:
+            return JsonResponse(
+                {'error': 'Authentication required', 'code': 'auth_required'},
+                status=401
+            )
+        return view_func(request, *args, **kwargs)
+    return wrapper
+
+
 def admin_required(view_func):
     """Decorator to require admin privileges"""
     @wraps(view_func)

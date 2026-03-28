@@ -66,7 +66,7 @@ from .forms import (
     ScheduleForm, SMSMessageForm, AdminStaffForm, VehicleForm, RouteForm,
     StudentTransportAssignmentForm, TransportFeeForm, MealPricingForm, StudentMealPaymentForm
 )
-from .decorators import admin_required, accountant_required, can_manage_students
+from .decorators import admin_required, accountant_required, can_manage_students, api_login_required
 from .utils import generate_payment_receipt, generate_receipt_qr
 from django.views.decorators.http import require_http_methods
 from datetime import datetime, date
@@ -350,11 +350,15 @@ def api_student_list(request):
     except Exception as e:
         import traceback
         logger.error(f"Student list error: {str(e)}\n{traceback.format_exc()}")
+        # Check if it it's a database connectivity error for clearer messaging
+        from django.db import OperationalError, DatabaseError
+        if isinstance(e, (OperationalError, DatabaseError)):
+            return JsonResponse({'error': f"Database connection error: {str(e)}"}, status=503)
         return JsonResponse({'error': f"Internal Server Error: {str(e)}"}, status=500)
 
 @csrf_exempt
 @require_http_methods(["GET"])
-@login_required
+@api_login_required
 def api_grades(request):
     """API endpoint for fetching grades"""
     try:
