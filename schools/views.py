@@ -1513,6 +1513,7 @@ def api_school_config(request):
             }
         })
     except Exception as e:
+        import traceback
         logger.error(f"Error in api_school_config: {str(e)}\n{traceback.format_exc()}")
         return JsonResponse({'error': str(e)}, status=500)
 
